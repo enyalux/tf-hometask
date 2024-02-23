@@ -37,3 +37,35 @@ module "vpc" {
   single_nat_gateway = true
   enable_ipv6        = false
 }
+
+
+
+
+resource "aws_security_group" "sg_ec2_access" {
+  name   = "sg-ec2-access"
+  vpc_id = module.vpc.vpc_id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "sg_ec2_access" {
+  security_group_id = aws_security_group.sg_ec2_access.id
+
+  from_port                    = 80
+  ip_protocol                  = "tcp"
+  to_port                      = 80
+#  referenced_security_group_id = aws_security_group.lb_public_access.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "ec2_internet_access" {
+  for_each          = toset(["80", "443"])
+  security_group_id = aws_security_group.sg_ec2_access.id
+
+  cidr_ipv4   = "0.0.0.0/0"
+  from_port   = each.value
+  ip_protocol = "tcp"
+  to_port     = each.value
+
+  tags = {
+    "Name" = "internet access to port ${each.value}"
+  }
+}
+
