@@ -9,3 +9,7 @@ output "vpc_name" {
 output "vpc_id" {
   value = module.vpc.vpc_id
 }
+
+output "lb_dns" {
+  value = "http://${aws_lb.app.dns_name}"
+}
