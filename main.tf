@@ -28,10 +28,14 @@ module "vpc" {
   name = "TF-vpc"
   cidr = "10.0.0.0/16"
   #azs = [ "eu-west-1a", "eu-west-1b", "eu-west-1c"]
-  azs = [for i in ["a", "b", "c"] : "${var.region}${i}"]
+  #azs = [for i in ["a", "b", "c"] : "${var.region}${i}"]
+  azs = [for i in ["a", "b"] : "${var.region}${i}"]
 
-  private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
-  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+  #private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+  #public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+
+  private_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
+  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24"]
 
   enable_nat_gateway = true
   single_nat_gateway = true
@@ -42,17 +46,17 @@ module "vpc" {
 
 
 resource "aws_security_group" "sg_ec2_access" {
-  name   = "sg-ec2-access"
+  name   = "sg_ec2_access"
   vpc_id = module.vpc.vpc_id
 }
 
 resource "aws_vpc_security_group_ingress_rule" "sg_ec2_access" {
   security_group_id = aws_security_group.sg_ec2_access.id
 
-  from_port                    = 80
-  ip_protocol                  = "tcp"
-  to_port                      = 80
-#  referenced_security_group_id = aws_security_group.lb_public_access.id
+  from_port                = 80
+  ip_protocol              = "tcp"
+  to_port                  = 80
+  referenced_security_group_id = aws_security_group.sg_ec2_access.id
 }
 
 resource "aws_vpc_security_group_egress_rule" "ec2_internet_access" {
@@ -68,4 +72,29 @@ resource "aws_vpc_security_group_egress_rule" "ec2_internet_access" {
     "Name" = "internet access to port ${each.value}"
   }
 }
+
+
+resource "aws_instance" "app" {
+  count         = var.instances_per_subnet * length(module.vpc.private_subnets)
+  ami           = var.ami_id
+  instance_type = "t3.micro"
+  subnet_id     = module.vpc.private_subnets[count.index % length(module.vpc.private_subnets)]
+
+  vpc_security_group_ids = [
+    aws_security_group.sg_ec2_access.id
+  ]
+  associate_public_ip_address = false
+
+  user_data = <<-EOF
+    #!/bin/sh
+    apt-get update
+    apt-get install -y nginx-light
+    echo 'Hello from instance app-${count.index}' > /var/www/html/index.html
+  EOF
+
+  tags = {
+    "Name" = "app-${count.index}"
+  }
+}
+
 
