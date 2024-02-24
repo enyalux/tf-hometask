@@ -43,21 +43,43 @@ module "vpc" {
 }
 
 
+resource "aws_security_group" "sg_lb_public" {
+  name   = "lb-sg-public"
+  vpc_id = module.vpc.vpc_id
+}
+
+resource "aws_security_group_rule" "sg_lb_public_ingress" {
+  type              = "ingress"
+  from_port         = 80
+  to_port           = 80
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.sg_lb_public.id
+}
+
+
+resource "aws_security_group_rule" "sg_lb_public_egress" {
+  type              = "egress"
+  from_port         = 80
+  to_port           = 80
+  protocol          = "tcp"
+  cidr_blocks       = module.vpc.private_subnets_cidr_blocks
+  security_group_id = aws_security_group.sg_lb_public.id
+}
 
 
 resource "aws_security_group" "sg_ec2_access" {
-  name   = "sg_ec2_access"
+  name   = "ec2-sg-access"
   vpc_id = module.vpc.vpc_id
 }
 
 resource "aws_vpc_security_group_ingress_rule" "sg_ec2_access" {
   security_group_id = aws_security_group.sg_ec2_access.id
 
-  from_port                = 80
-  ip_protocol              = "tcp"
-  to_port                  = 80
-#  referenced_security_group_id = aws_security_group.sg_ec2_access.id
-  cidr_ipv4                = "0.0.0.0/0"
+  from_port                    = 80
+  ip_protocol                  = "tcp"
+  to_port                      = 80
+  referenced_security_group_id = aws_security_group.sg_lb_public.id
 }
 
 resource "aws_vpc_security_group_egress_rule" "ec2_internet_access" {
